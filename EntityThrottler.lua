@@ -36,7 +36,7 @@ if not debugmode then
     until error ~= nil
     if error ~= "" then
         util.create_thread(function()
-            local time = util.current_time_millis() + 2500
+            local time = util.current_time_millis() + 5000
             while time > util.current_time_millis() do
                 directx.draw_text(0.5, 0.5, error, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
                 util.yield()
