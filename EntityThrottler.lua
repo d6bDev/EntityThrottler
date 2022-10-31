@@ -1,24 +1,26 @@
 -- Made by d6b
 
 local version = 0.4
-local success
+local update
 async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headers, status_code)
     local gitversion = str:match("local version = (.-)[\r\n]")
     if gitversion and type(gitversion) == "string" then
         gitversion = tonumber(gitversion)
     end
+    update = false
+    util.toast(tostring(gitversion)..", "..tostring(version))
     if gitversion ~= version then
-        success = true
+        update = true
     end
-    success = false
-end, function() success = false end)
+end, function() update = false end)
 async_http.dispatch()
 repeat
     directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
     util.yield()
-until success ~= nil
+until update ~= nil
 
-if success then
+if update then
+    update = false
     async_http.init('raw.githubusercontent.com','/d6bDev/EntityThrottler/main/EntityThrottler.lua', function(str)
         local err = select(2, load(str))
         if err then
@@ -28,9 +30,14 @@ if success then
         file:write(str)
         file:close()
         util.toast("Update successful.")
+        update = true
         util.restart_script()
     end)
     async_http.dispatch()
+    repeat
+        directx.draw_text(0.5, 0.5, "Updating...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
+        util.yield()
+    until update
 end
 
 local debugmode = true
