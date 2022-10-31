@@ -16,7 +16,7 @@ if not debugmode then
                         local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
                         file:write(str)
                         file:close()
-                        util.toast("Updated to version "..tostring(gitversion))
+                        util.toast("Successfully updated to version "..tostring(gitversion))
                         util.restart_script()
                     else
                         util.toast("Failed to download update: Error loading file.")
