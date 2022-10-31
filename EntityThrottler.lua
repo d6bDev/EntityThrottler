@@ -4,9 +4,9 @@ local debugmode = false
 local version = 0.5
 if not debugmode then
     local gitversion
-    local update
+    local error
     async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
-        update = false
+        error = ""
         if statuscode == 200 then
             gitversion = str:match("local version = (.-)[\r\n]")
             if gitversion and type(gitversion) == "string" then
@@ -19,22 +19,30 @@ if not debugmode then
                         util.toast("Successfully updated to version "..tostring(gitversion))
                         util.restart_script()
                     else
-                        util.toast("Failed to download update: Error loading file.")
+                        error = "Failed to download update: Error loading file."
                     end
                 end
             end
         else
-            util.toast("Failed to find version information: Unexpected response code.")
+            error = "Failed to find version information: Unexpected response code."
         end
     end, function()
-        util.toast("Failed to find version information: Request timed out.")
-        update = false
+        error = "Failed to find version information: Request timed out."
     end)
     async_http.dispatch()
     repeat
         directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
         util.yield()
-    until update ~= nil
+    until error ~= nil
+    if error ~= "" then
+        util.create_thread(function()
+            local time = util.current_time_millis() + 2500
+            while time > util.current_time_millis() do
+                directx.draw_text(0.5, 0.5, error, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
+                util.yield()
+            end
+        end, nil)
+    end
 end
 
 local synctimer = {}
