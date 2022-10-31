@@ -20,10 +20,6 @@ until update ~= nil
 
 if update then
     async_http.init('raw.githubusercontent.com','/d6bDev/EntityThrottler/main/EntityThrottler.lua', function(str)
-        local err = select(2, load(str))
-        if err then
-            util.toast("Script failed to download. Please try again later. If this continues to happen then manually update via github.")
-        return end
         local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "wb")
         file:write(str)
         file:close()
