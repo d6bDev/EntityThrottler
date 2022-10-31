@@ -1,50 +1,42 @@
 -- Made by d6b
-aesd
-local version = 0.5
-local gitversion
-local update
-async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headers, status_code)
-    gitversion = str:match("local version = (.-)[\r\n]")
-    update = false
-    if gitversion and type(gitversion) == "string" then
-        if tonumber(gitversion) ~= version then
-            update = true
-        end
-    else
-        util.toast("Failed to find version information.")
-    end
-end, function()
-    util.toast("Failed to find version information.")
-    update = false
-end)
-async_http.dispatch()
-repeat
-    directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
-    util.yield()
-until update ~= nil
 
-if update then
-    async_http.init('raw.githubusercontent.com','/d6bDev/EntityThrottler/main/EntityThrottler.lua', function(str)
-        local success, err = pcall(load, str)
-        if success then
-            local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "wb")
-            file:write(str)
-            file:close()
-            util.toast("Updated to version "..tostring(gitversion))
-            util.restart_script()
+local debugmode = false
+local version = 0.5
+if not debugmode then
+    local gitversion
+    local update
+    async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
+        update = false
+        if statuscode == 200 then
+            gitversion = str:match("local version = (.-)[\r\n]")
+            if gitversion and type(gitversion) == "string" then
+                if tonumber(gitversion) ~= version then
+                    local chunk, err = load(str)
+                    if chunk then
+                        local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
+                        file:write(str)
+                        file:close()
+                        util.toast("Updated to version "..tostring(gitversion))
+                        util.restart_script()
+                    else
+                        util.toast("Failed to download update: Error loading file.")
+                    end
+                end
+            end
         else
-            util.toast("Script failed to download properly.")
+            util.toast("Failed to find version information: Unexpected response code.")
         end
+    end, function()
+        util.toast("Failed to find version information: Request timed out.")
         update = false
     end)
     async_http.dispatch()
     repeat
-        directx.draw_text(0.5, 0.5, "Updating...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
+        directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
         util.yield()
-    until not update
+    until update ~= nil
 end
 
-local debugmode = true
 local synctimer = {}
 local settings = {
     auto = {
@@ -175,9 +167,6 @@ local function set_as_mission_entity(addr, toggle)
         end
     elseif debugmode then
         util.log("No NetObj for "..tostring(addr))
-    end
-    if debugmode then
-        util.log("No changes made to "..tostring(addr))
     end
     return false
 end
