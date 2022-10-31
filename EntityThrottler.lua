@@ -1,7 +1,7 @@
 -- Made by d6b
 
 local debugmode = false
-local version = 0.5
+local version = 0.4
 if not debugmode then
     local gitversion
     local error
