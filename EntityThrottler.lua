@@ -1,6 +1,6 @@
 -- Made by d6b
 
-local version = 0.4
+local version = 0.5
 local update
 async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headers, status_code)
     local gitversion = str:match("local version = (.-)[\r\n]")
