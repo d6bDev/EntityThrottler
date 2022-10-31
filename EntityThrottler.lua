@@ -4,12 +4,13 @@ local version = 0.4
 local update
 async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headers, status_code)
     local gitversion = str:match("local version = (.-)[\r\n]")
-    if gitversion and type(gitversion) == "string" then
-        gitversion = tonumber(gitversion)
-    end
     update = false
-    if gitversion ~= version then
-        update = true
+    if gitversion and type(gitversion) == "string" then
+        if tonumber(gitversion) ~= version then
+            update = true
+        end
+    else
+        util.toast("Failed to find version information.")
     end
 end, function() update = false end)
 async_http.dispatch()
@@ -20,12 +21,17 @@ until update ~= nil
 
 if update then
     async_http.init('raw.githubusercontent.com','/d6bDev/EntityThrottler/main/EntityThrottler.lua', function(str)
-        local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "wb")
-        file:write(str)
-        file:close()
-        util.toast("Update successful.")
+        local success, err = pcall(load, str)
+        if success then
+            local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "wb")
+            file:write(str)
+            file:close()
+            util.toast("Update successful.")
+            util.restart_script()
+        else
+            util.toast("Script failed to download properly.")
+        end
         update = false
-        util.restart_script()
     end)
     async_http.dispatch()
     repeat
