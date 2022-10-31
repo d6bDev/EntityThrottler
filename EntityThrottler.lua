@@ -1,9 +1,10 @@
 -- Made by d6b
 
 local version = 0.5
+local gitversion
 local update
 async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headers, status_code)
-    local gitversion = str:match("local version = (.-)[\r\n]")
+    gitversion = str:match("local version = (.-)[\r\n]")
     update = false
     if gitversion and type(gitversion) == "string" then
         if tonumber(gitversion) ~= version then
@@ -12,7 +13,10 @@ async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/Entit
     else
         util.toast("Failed to find version information.")
     end
-end, function() update = false end)
+end, function()
+    util.toast("Failed to find version information.")
+    update = false
+end)
 async_http.dispatch()
 repeat
     directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
@@ -26,7 +30,7 @@ if update then
             local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "wb")
             file:write(str)
             file:close()
-            util.toast("Update successful.")
+            util.toast("Updated to version "..tostring(gitversion))
             util.restart_script()
         else
             util.toast("Script failed to download properly.")
