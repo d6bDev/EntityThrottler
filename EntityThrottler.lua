@@ -1,6 +1,6 @@
 -- Made by d6b
 aesd
-local version = 0.4
+local version = 0.5
 local gitversion
 local update
 async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headers, status_code)
