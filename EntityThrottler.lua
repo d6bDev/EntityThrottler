@@ -91,15 +91,15 @@ local function notification(body, ...)
     end
 end
 local function update_lua()
-    local error
+    local err
     async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
-        error = ""
+        err = ""
         if statuscode == 200 then
             local gitversion = str:match("local version = (.-)[\r\n]")
             local gitchangelog = str:match("local changelog = %[%[(.-)%]%]")
             if gitversion and type(gitversion) == "string" then
                 if tonumber(gitversion) ~= version then
-                    local chunk, err = load(str)
+                    local chunk = load(str)
                     if chunk then
                         local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
                         file:write(str)
@@ -107,28 +107,29 @@ local function update_lua()
                         util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
                         util.restart_script()
                     else
-                        error = "Failed to download update: Error loading file."
+                        err = "Failed to download update: Error loading file."
                     end
                 end
             end
         else
-            error = "Failed to find version information: Unexpected response code."
+            err = "Failed to find version information: Unexpected response code."
         end
     end, function()
-        error = "Failed to find version information: Request timed out."
+        err = "Failed to find version information: Request timed out."
     end)
     async_http.dispatch()
     repeat
         directx.draw_text(0.5, 0.5, "Checking for updates...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
         util.yield()
-    until error ~= nil
-    if error ~= "" then
+    until err ~= nil
+    if err ~= "" then
         local time = util.current_time_millis() + 5000
         while time > util.current_time_millis() do
-            directx.draw_text(0.5, 0.5, error, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
+            directx.draw_text(0.5, 0.5, err, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
             util.yield()
         end
     end
+    return err
 end
 local function does_entity_from_pointer_exist(addr)
     if allentities.lastupdate < util.current_time_millis() then
@@ -729,9 +730,10 @@ menu.toggle(settingsroot, "Auto Update", {}, "", function(toggle)
 end, true)
 
 menu.action(settingsroot, "Check for Updates", {}, "", function(toggle)
-    update_lua()
-    util.yield(50)
-    util.toast("No updates found.")
+    local err = update_lua()
+    if err == "" then
+        util.toast("No updates found.")
+    end
 end)
 
 menu.action(settingsroot, "View Changelog", {}, "", function(toggle)
@@ -748,5 +750,3 @@ if not debugmode then
         end
     end, nil)
 end
-
-util.keep_running()
