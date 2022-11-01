@@ -2,8 +2,7 @@
 
 local debugmode = true
 local version = 0.5
-local changelog = [[  v0.5
-- Added Balls
+local changelog = [[- Added Balls
 
 - Improved Sex]]
 if not debugmode then
