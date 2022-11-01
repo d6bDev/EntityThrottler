@@ -1,48 +1,53 @@
 -- Made by d6b
 
-local debugmode = false
-local version = 0.4
+local debugmode = true
+local version = 0.5
+local changelog = [[  v0.5
+- Added Balls
+
+- Improved Sex]]
 if not debugmode then
-    local gitversion
-    local error
-    async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
-        error = ""
-        if statuscode == 200 then
-            gitversion = str:match("local version = (.-)[\r\n]")
-            if gitversion and type(gitversion) == "string" then
-                if tonumber(gitversion) ~= version then
-                    local chunk, err = load(str)
-                    if chunk then
-                        local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
-                        file:write(str)
-                        file:close()
-                        util.toast("Successfully updated to version "..tostring(gitversion))
-                        util.restart_script()
-                    else
-                        error = "Failed to download update: Error loading file."
+    util.create_thread(function()
+        local error
+        async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
+            error = ""
+            if statuscode == 200 then
+                local gitversion = str:match("local version = (.-)[\r\n]")
+                local gitchangelog = str:match("local changelog = %[%[(.-)%]%]")
+                if gitversion and type(gitversion) == "string" then
+                    if tonumber(gitversion) ~= version then
+                        local chunk, err = load(str)
+                        if chunk then
+                            local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
+                            file:write(str)
+                            file:close()
+                            util.toast("Successfully updated to version "..gitversion)
+                            util.toast("Changelog\n"..gitchangelog)
+                            util.restart_script()
+                        else
+                            error = "Failed to download update: Error loading file."
+                        end
                     end
                 end
+            else
+                error = "Failed to find version information: Unexpected response code."
             end
-        else
-            error = "Failed to find version information: Unexpected response code."
-        end
-    end, function()
-        error = "Failed to find version information: Request timed out."
-    end)
-    async_http.dispatch()
-    repeat
-        directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
-        util.yield()
-    until error ~= nil
-    if error ~= "" then
-        util.create_thread(function()
+        end, function()
+            error = "Failed to find version information: Request timed out."
+        end)
+        async_http.dispatch()
+        repeat
+            directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
+            util.yield()
+        until error ~= nil
+        if error ~= "" then
             local time = util.current_time_millis() + 5000
             while time > util.current_time_millis() do
                 directx.draw_text(0.5, 0.5, error, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
                 util.yield()
             end
-        end, nil)
-    end
+        end
+    end, nil)
 end
 
 local synctimer = {}
@@ -419,7 +424,7 @@ menu.toggle_loop(bigthrottler, "Enable", {}, "", function()
     local pos = players.get_position(players.user())
     for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
         if whitelist.bigvehicle.logged[Pointer] == nil and (v3.distance(entities.get_position(Pointer), pos) < settings.bigvehicle.radius) then
-            if bigvehicle[entities.get_model_hash(Pointer)] and whitelist.bigvehicle.owner[Pointer] ~= -1 and whitelist.bigvehicle.owner[Pointer] ~= players.user() and ((settings.bigvehicle.excludeplayer and not is_pointer_a_player_vehicle(Pointer)) or not settings.bigvehicle.excludeplayer) then
+            if bigvehicle[entities.get_model_hash(Pointer)] and whitelist.bigvehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.bigvehicle.owner[Pointer] ~= players.user())) and ((settings.bigvehicle.excludeplayer and not is_pointer_a_player_vehicle(Pointer)) or not settings.bigvehicle.excludeplayer) then
                 whitelist.bigvehicle.owner[Pointer] = get_entity_owner(Pointer)
                 whitelist.bigvehicle.logged[Pointer] = true
             else
@@ -487,11 +492,10 @@ local vehiclethrottler = menu.list(menu.my_root(), "Vehicle Throttler", {}, "")
 menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
     local Pointers = {}
     local pos = players.get_position(players.user())
-    local allvehicles = entities.get_all_vehicles_as_pointers()
-    for i, Pointer in ipairs(allvehicles) do
+    for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
         if not whitelist.vehicle.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.vehicle.radius) then
             whitelist.vehicle.owner[Pointer] = get_entity_owner(Pointer)
-            if whitelist.vehicle.owner[Pointer] ~= -1 and whitelist.vehicle.owner[Pointer] ~= players.user() and ((settings.vehicle.excludeplayer and not is_pointer_a_player_vehicle(Pointer)) or not settings.vehicle.excludeplayer) then
+            if whitelist.vehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.vehicle.owner[Pointer] ~= players.user())) and ((settings.vehicle.excludeplayer and not is_pointer_a_player_vehicle(Pointer)) or not settings.vehicle.excludeplayer) then
                 whitelist.vehicle.timer[Pointer] = util.current_time_millis()
             else
                 whitelist.vehicle.timer[Pointer] = 0
@@ -500,6 +504,9 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
         if whitelist.vehicle.timer[Pointer] and (whitelist.vehicle.timer[Pointer] + settings.vehicle.interval > util.current_time_millis()) then
             Pointers[#Pointers+1] = Pointer
         end
+    end
+    if debugmode then
+        util.draw_debug_text("Vehicles: "..#Pointers.."/"..#entities.get_all_vehicles_as_pointers())
     end
     if #Pointers > settings.vehicle.limit then
         local owners = {}
@@ -564,13 +571,11 @@ local objectthrottler = menu.list(menu.my_root(), "Object Throttler", {}, "")
 menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
     local Pointers = {}
     local pos = players.get_position(players.user())
-    local allobjects = entities.get_all_objects_as_pointers()
-    local allpickups = entities.get_all_pickups_as_pointers()
-    local og = merge_table(false, allobjects, allpickups)
+    local og = merge_table(true, entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
     for i, Pointer in ipairs(og) do
         if not whitelist.object.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.object.radius) then
             whitelist.object.owner[Pointer] = get_entity_owner(Pointer)
-            if whitelist.object.owner[Pointer] ~= -1 and whitelist.object.owner[Pointer] ~= players.user() then
+            if whitelist.object.owner[Pointer] ~= -1 and (debugmode or (whitelist.object.owner[Pointer] ~= players.user())) then
                 whitelist.object.timer[Pointer] = util.current_time_millis()
             else
                 whitelist.object.timer[Pointer] = 0
@@ -579,6 +584,9 @@ menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
         if whitelist.object.timer[Pointer] and (whitelist.object.timer[Pointer] + settings.object.interval > util.current_time_millis()) then
             Pointers[#Pointers+1] = Pointer
         end
+    end
+    if debugmode then
+        util.draw_debug_text("Objects: "..#Pointers.."/"..#og)
     end
     if #Pointers > settings.object.limit then
         local owners = {}
@@ -641,10 +649,10 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
     local Pointers = {}
     local pos = players.get_position(players.user())
     local allpeds = entities.get_all_peds_as_pointers()
-    for i, Pointer in ipairs(allpeds) do
+    for i, Pointer in ipairs(entities.get_all_peds_as_pointers()) do
         if not whitelist.ped.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.ped.radius) then
             whitelist.ped.owner[Pointer] = get_entity_owner(Pointer)
-            if whitelist.ped.owner[Pointer] ~= -1 and entities.get_player_info(Pointer) == 0 and whitelist.ped.owner[Pointer] ~= players.user() then
+            if whitelist.ped.owner[Pointer] ~= -1 and entities.get_player_info(Pointer) == 0 and (debugmode or (whitelist.ped.owner[Pointer] ~= players.user())) then
                 whitelist.ped.timer[Pointer] = util.current_time_millis()
             else
                 whitelist.ped.timer[Pointer] = 0
@@ -653,6 +661,9 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
         if whitelist.ped.timer[Pointer] and (whitelist.ped.timer[Pointer] + settings.ped.interval > util.current_time_millis()) then
             Pointers[#Pointers+1] = Pointer
         end
+    end
+    if debugmode then
+        util.draw_debug_text("Peds: "..#Pointers.."/"..#entities.get_all_peds_as_pointers())
     end
     if #Pointers > settings.ped.limit then
         local owners = {}
