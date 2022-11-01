@@ -1,53 +1,8 @@
 -- Made by d6b
 
-local debugmode = true
+local debugmode = false
 local version = 0.5
-local changelog = [[- Added Balls
-
-- Improved Sex]]
-if not debugmode then
-    util.create_thread(function()
-        local error
-        async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
-            error = ""
-            if statuscode == 200 then
-                local gitversion = str:match("local version = (.-)[\r\n]")
-                local gitchangelog = str:match("local changelog = %[%[(.-)%]%]")
-                if gitversion and type(gitversion) == "string" then
-                    if tonumber(gitversion) ~= version then
-                        local chunk, err = load(str)
-                        if chunk then
-                            local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
-                            file:write(str)
-                            file:close()
-                            util.toast("Successfully updated to version "..gitversion)
-                            util.toast("Changelog\n"..gitchangelog)
-                            util.restart_script()
-                        else
-                            error = "Failed to download update: Error loading file."
-                        end
-                    end
-                end
-            else
-                error = "Failed to find version information: Unexpected response code."
-            end
-        end, function()
-            error = "Failed to find version information: Request timed out."
-        end)
-        async_http.dispatch()
-        repeat
-            directx.draw_text(0.5, 0.5, "Getting version information...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
-            util.yield()
-        until error ~= nil
-        if error ~= "" then
-            local time = util.current_time_millis() + 5000
-            while time > util.current_time_millis() do
-                directx.draw_text(0.5, 0.5, error, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
-                util.yield()
-            end
-        end
-    end, nil)
-end
+local changelog = [[- Added Auto-Updater using github (Disable in Settings > Auto Update)]]
 
 local synctimer = {}
 local settings = {
@@ -88,6 +43,7 @@ local settings = {
         radius = 25,
         timeout = 15000,
     },
+    autoupdate = true,
 }
 local whitelist = {
     auto = {
@@ -125,6 +81,46 @@ local function notification(body, ...)
     util.toast(body, ...)
     if debugmode then
         util.log(body)
+    end
+end
+local function update_lua()
+    local error
+    async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
+        error = ""
+        if statuscode == 200 then
+            local gitversion = str:match("local version = (.-)[\r\n]")
+            local gitchangelog = str:match("local changelog = %[%[(.-)%]%]")
+            if gitversion and type(gitversion) == "string" then
+                if tonumber(gitversion) ~= version then
+                    local chunk, err = load(str)
+                    if chunk then
+                        local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
+                        file:write(str)
+                        file:close()
+                        util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
+                        util.restart_script()
+                    else
+                        error = "Failed to download update: Error loading file."
+                    end
+                end
+            end
+        else
+            error = "Failed to find version information: Unexpected response code."
+        end
+    end, function()
+        error = "Failed to find version information: Request timed out."
+    end)
+    async_http.dispatch()
+    repeat
+        directx.draw_text(0.5, 0.5, "Checking for updates...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
+        util.yield()
+    until error ~= nil
+    if error ~= "" then
+        local time = util.current_time_millis() + 5000
+        while time > util.current_time_millis() do
+            directx.draw_text(0.5, 0.5, error, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
+            util.yield()
+        end
     end
 end
 local function does_entity_from_pointer_exist(addr)
@@ -718,5 +714,26 @@ end)
 menu.slider(pedthrottler, "Radius", {}, "Specify a distance around you where the entities will be considered.", 0, 1000, settings.ped.radius, 5, function(value)
     settings.ped.radius = value
 end)
+
+local settingsroot = menu.list(menu.my_root(), "Settings", {}, "")
+
+menu.toggle(settingsroot, "Auto Update", {}, "", function(toggle)
+    settings.autoupdate = toggle
+end, true)
+
+menu.action(settingsroot, "Check for Updates", {}, "", function(toggle)
+    update_lua()
+end)
+
+if not debugmode then
+    util.create_thread(function()
+        for i = 1, 8 do
+            util.yield()
+        end
+        if settings.autoupdate then
+            update_lua()
+        end
+    end, nil)
+end
 
 util.keep_running()
