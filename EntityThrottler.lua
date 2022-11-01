@@ -2,7 +2,14 @@
 
 local debugmode = false
 local version = 0.5
-local changelog = [[- Added Auto-Updater using github (Disable in Settings > Auto Update)]]
+local changelog = [[- Added Updater using Github
+- Added Settings
+- Added Settings > Auto Update (Enabled by default!)
+- Added Settings > Check for Updates
+- Added Settings > View Changelog
+
+- Fixed Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled
+- Fixed Big Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled]]
 
 local synctimer = {}
 local settings = {
@@ -15,14 +22,14 @@ local settings = {
         timeout = 30000,
     },
     bigvehicle = {
-        excludeplayer = true,
+        excludeplayer = false,
         cleanup = false,
         limit = 5,
         radius = 250,
         timeout = 15000,
     },
     vehicle = {
-        excludeplayer = true,
+        excludeplayer = false,
         cleanup = false,
         interval = 5000,
         limit = 10,
@@ -723,6 +730,12 @@ end, true)
 
 menu.action(settingsroot, "Check for Updates", {}, "", function(toggle)
     update_lua()
+    util.yield(50)
+    util.toast("No updates found.")
+end)
+
+menu.action(settingsroot, "View Changelog", {}, "", function(toggle)
+    util.toast("Version "..version.."\n"..changelog)
 end)
 
 if not debugmode then
