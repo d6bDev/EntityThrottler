@@ -1,15 +1,17 @@
 -- Made by d6b
 
 local debugmode = false
-local version = 0.5
-local changelog = [[- Added Updater using Github
+local version = 0.501
+local changelog = [[- Fixed Check for Updates
+Version 0.5
+- Added Updater using Github
 - Added Settings
 - Added Settings > Auto Update (Enabled by default!)
 - Added Settings > Check for Updates
 - Added Settings > View Changelog
 
-- Fixed Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled (Now properly disabled!)
-- Fixed Big Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled (Now properly disabled!)]]
+- Fixed Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled
+- Fixed Big Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled]]
 
 local synctimer = {}
 local settings = {
@@ -725,24 +727,28 @@ end)
 
 local settingsroot = menu.list(menu.my_root(), "Settings", {}, "")
 
-menu.toggle(settingsroot, "Auto Update", {}, "Enabling this checks for updates every time the lua is run.", function(toggle)
+menu.toggle(settingsroot, "Auto Update", {}, "", function(toggle)
     settings.autoupdate = toggle
 end, true)
 
 local updatetimer = 0
 menu.action(settingsroot, "Check for Updates", {}, "Manually check for updates.", function(toggle)
-    if updatetimer < util.current_time_ms() then
-        updatetimer = util.current_time_ms() + 15000
+    if updatetimer < util.current_time_millis() then
+        updatetimer = util.current_time_millis() + 15000
         local err = update_lua()
         if err == "" then
-            util.toast("No updates found.")
+            local time = util.current_time_millis() + 2000
+            while time > util.current_time_millis() do
+                directx.draw_text(0.5, 0.5, "No updates found.", ALIGN_CENTRE, 1, {r = 0.5, g = 1, b = 0.5, a = 1})
+                util.yield()
+            end
         end
     else
         util.toast("Please wait before trying again.")
     end
 end)
 
-menu.action(settingsroot, "View Changelog", {}, "View the most recent changelog.", function(toggle)
+menu.action(settingsroot, "View Changelog", {}, "", function(toggle)
     util.toast("Version "..version.."\n"..changelog)
 end)
 
