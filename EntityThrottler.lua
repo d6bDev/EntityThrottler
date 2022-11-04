@@ -1,18 +1,17 @@
 -- Made by d6b
 
 local debugmode = false
-local version = 0.501
-local changelog = [[- Fixed Check for Updates
-Version 0.5
-- Added Updater using Github
-- Added Settings
-- Added Settings > Auto Update (Enabled by default!)
-- Added Settings > Check for Updates
-- Added Settings > View Changelog
+local version = 0.6
+local changelog = [[- Auto Updater will no longer display errors on lua startup
 
-- Fixed Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled
-- Fixed Big Vehicle Throttler > Exclude Player Vehicles being silently enabled by default while the toggle showed up as disabled]]
+- Improved entity cleanup
+- Improved player timeout
 
+- Hopefully fixed all exceptions when cleanup kicks in, caused by attempting to delete nonexistant entities due to a delayed check
+- Fixed some functions
+- Fixed some minor bugs]]
+
+local deletethis = {}
 local synctimer = {}
 local settings = {
     auto = {
@@ -82,17 +81,13 @@ for i, Model in ipairs(bigvehiclenames) do
     bigvehicle[util.joaat(Model)] = Model
 end
 
-local allentities = {lastupdate = 0}
-local allpeds2 = {lastupdate = 0}
-local allvehicles2 = {lastupdate = 0}
-
 local function notification(body, ...)
     util.toast(body, ...)
     if debugmode then
         util.log(body)
     end
 end
-local function update_lua()
+local function update_lua(automatic)
     local err
     async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
         err = ""
@@ -124,8 +119,8 @@ local function update_lua()
         directx.draw_text(0.5, 0.5, "Checking for updates...", ALIGN_CENTRE, 1, {r = 1, g = 1, b = 1, a = 1})
         util.yield()
     until err ~= nil
-    if err ~= "" then
-        local time = util.current_time_millis() + 5000
+    if not automatic and err ~= "" then
+        local time = util.current_time_millis() + 2000
         while time > util.current_time_millis() do
             directx.draw_text(0.5, 0.5, err, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
             util.yield()
@@ -134,65 +129,51 @@ local function update_lua()
     return err
 end
 local function does_entity_from_pointer_exist(addr)
-    if allentities.lastupdate < util.current_time_millis() then
-        allentities = {lastupdate = util.current_time_millis()}
-        for i, Pointer in entities.get_all_vehicles_as_pointers() do
-            allentities[Pointer] = true
-        end
-        for i, Pointer in entities.get_all_peds_as_pointers() do
-            allentities[Pointer] = true
-        end
-        for i, Pointer in entities.get_all_pickups_as_pointers() do
-            allentities[Pointer] = true
-        end
-        for i, Pointer in entities.get_all_objects_as_pointers() do
-            allentities[Pointer] = true
-        end
-    end
-    return allentities[addr] or false
-end
-local function is_pointer_a_player(addr)
-    if allpeds2.lastupdate < util.current_time_millis() then
-        allpeds2 = {lastupdate = util.current_time_millis()}
-        for i, Pointer in entities.get_all_peds_as_pointers() do
-            allpeds2[Pointer] = true
-        end
-    end
-    return allpeds2[addr] and entities.get_player_info(addr) ~= 0
-end
-local function is_pointer_a_player_vehicle(addr)
-    if allvehicles2.lastupdate < util.current_time_millis() then
-        allvehicles2 = {lastupdate = util.current_time_millis()}
-        for i, Pointer in entities.get_all_vehicles_as_pointers() do
-            allvehicles2[Pointer] = true
-        end
-    end
-    return allvehicles2[addr] and entities.get_vehicle_has_been_owned_by_player(addr)
-end
-local function is_mission_entity(addr)
-    local NetObj = memory.read_long(addr + 0xD0)
-    return ((NetObj and NetObj ~= 0) and (memory.read_ubyte(NetObj + 0x4E) ~= 0))
-end
-local function set_as_mission_entity(addr, toggle)
-    local NetObj = memory.read_long(addr + 0xD0)
-    if (NetObj and NetObj ~= 0) then
-        if toggle and memory.read_ubyte(NetObj + 0x4E) == 0 then
-            memory.write_ubyte(NetObj + 0x4E, 4)
-            return true
-        elseif memory.read_ubyte(NetObj + 0x4E) ~= 0 then
-            memory.write_ubyte(NetObj + 0x4E, 0)
+    for i, Pointer in entities.get_all_vehicles_as_pointers() do
+        if Pointer == addr then
             return true
         end
-    elseif debugmode then
-        util.log("No NetObj for "..tostring(addr))
+    end
+    for i, Pointer in entities.get_all_peds_as_pointers() do
+        if Pointer == addr then
+            return true
+        end
+    end
+    for i, Pointer in entities.get_all_pickups_as_pointers() do
+        if Pointer == addr then
+            return true
+        end
+    end
+    for i, Pointer in entities.get_all_objects_as_pointers() do
+        if Pointer == addr then
+            return true
+        end
     end
     return false
 end
-local function delete(addr)
-    if not is_pointer_a_player(addr) then
-        if debugmode then
-            set_as_mission_entity(addr, false)
+local function is_entity_from_pointer_a_player(addr)
+    for i, Pointer in entities.get_all_peds_as_pointers() do
+        if Pointer == addr then
+            return entities.get_player_info(addr) ~= 0
         end
+    end
+    return false
+end
+local function is_entity_from_pointer_a_player_vehicle(addr)
+    for i, Pointer in entities.get_all_vehicles_as_pointers() do
+        if Pointer == addr then
+            return entities.get_vehicle_has_been_owned_by_player(addr)
+        end
+    end
+    return false
+end
+local function is_entity_from_pointer_a_mission_entity(addr)
+    local NetObj = memory.read_long(addr + 0xD0)
+    return ((NetObj and NetObj ~= 0) and (memory.read_ubyte(NetObj + 0x4E) ~= 0))
+end
+local function delete(addr)
+    if does_entity_from_pointer_exist(addr) and not is_entity_from_pointer_a_player(addr) then
+        deletethis[addr] = util.current_time_millis()
         entities.delete_by_pointer(addr)
     end
 end
@@ -201,7 +182,7 @@ local function merge_table(noduplicates, ...)
     local out = (noduplicates and {} or tbl[1])
     for i = 1, #tbl do
         for n = 1, #tbl[i] do
-            out[#out + 1] = tbl[i][n]
+            out[#out+1] = tbl[i][n]
         end
     end
     return out
@@ -230,7 +211,7 @@ local function get_entity_owner(addr)
     if type(addr) == "table" then
         local owners = {}
         for k, v in pairs(addr) do
-            owners[#owners + 1] = get_entity_owner(v)
+            owners[#owners+1] = get_entity_owner(v)
         end
         return get_highest_count(owners)
     else
@@ -245,6 +226,28 @@ local function get_entity_owner(addr)
     end
 end
 
+util.create_thread(function()
+    while true do
+        local num = 0
+        local exist = 0
+        for addr, time in pairs(deletethis) do
+            if time then
+                exist = exist+1
+                if does_entity_from_pointer_exist(addr) then
+                    num = num+1
+                    entities.delete_by_pointer(addr)
+                end
+                if time + 60000 < util.current_time_millis() then
+                    deletethis[addr] = nil
+                end
+            end
+        end
+        if debugmode then
+            util.draw_debug_text("Deleted: "..num.."/"..exist)
+        end
+        util.yield()
+    end
+end, nil)
 for i = 0, 31 do
     whitelist.auto[i] = {}
     whitelist.auto[i].owner = {}
@@ -259,32 +262,46 @@ for i = 0, 31 do
         local pid = i
         while true do
             if players.exists(pid) then
-                if debugmode then
-                    local owned = 0
-                    local allents = merge_table(true, entities.get_all_vehicles_as_pointers(), entities.get_all_peds_as_pointers(), entities.get_all_pickups_as_pointers(), entities.get_all_objects_as_pointers())
-                    local exists = 0
-                    for n, addr in ipairs(allents) do
-                        if get_entity_owner(addr) == pid then
-                            owned = owned + 1
-                        end
-                        if does_entity_from_pointer_exist(addr) then
-                            exists = exists + 1
-                        end
-                    end
-                    if owned > 1 then
-                        util.draw_debug_text(players.get_name(pid).." - "..#whitelist.auto[i].owner.."/"..owned)
-                    end
-                    if exists ~= #allents then
-                        notification(exists.."/"..#allents)
-                    end
-                end
                 if pid ~= players.user() and synctimer[pid] > util.current_time_millis() then
                     local Sync = menu.ref_by_rel_path(menu.player_root(pid), "Incoming Syncs>Block")
                     menu.trigger_command(Sync, "on")
+                    local knownentities = {}
+                    for n, Pointer in entities.get_all_vehicles_as_pointers() do
+                        knownentities[Pointer] = true
+                    end
+                    for n, Pointer in entities.get_all_peds_as_pointers() do
+                        knownentities[Pointer] = true
+                    end
+                    for n, Pointer in entities.get_all_pickups_as_pointers() do
+                        knownentities[Pointer] = true
+                    end
+                    for n, Pointer in entities.get_all_objects_as_pointers() do
+                        knownentities[Pointer] = true
+                    end
                     while synctimer[pid] > util.current_time_millis() and players.exists(pid) do
+                        for n, Pointer in entities.get_all_vehicles_as_pointers() do
+                            if not knownentities[Pointer] and get_entity_owner(Pointer) == pid then
+                                delete(Pointer)
+                            end
+                        end
+                        for n, Pointer in entities.get_all_peds_as_pointers() do
+                            if not knownentities[Pointer] and get_entity_owner(Pointer) == pid then
+                                delete(Pointer)
+                            end
+                        end
+                        for n, Pointer in entities.get_all_pickups_as_pointers() do
+                            if not knownentities[Pointer] and get_entity_owner(Pointer) == pid then
+                                delete(Pointer)
+                            end
+                        end
+                        for n, Pointer in entities.get_all_objects_as_pointers() do
+                            if not knownentities[Pointer] and get_entity_owner(Pointer) == pid then
+                                delete(Pointer)
+                            end
+                        end
                         util.yield()
                     end
-                    util.toast(players.get_name(pid).." is no longer in timeout", TOAST_ALL)
+                    notification(players.get_name(pid).." is no longer in timeout", TOAST_ALL)
                     menu.trigger_command(Sync, "off")
                 end
             end
@@ -307,7 +324,7 @@ menu.toggle_loop(autothrottler, "Enable", {}, "", function()
                 whitelist.auto[owner].timer[Pointer] = util.current_time_millis()
                 local model = entities.get_model_hash(Pointer)
                 whitelist.auto[owner].models[model] = (whitelist.auto[owner].models[model] or 0) + 1
-                if is_mission_entity(Pointer) then
+                if is_entity_from_pointer_a_mission_entity(Pointer) then
                     whitelist.auto[owner].highpriority[Pointer] = true
                     whitelist.auto[owner].highpriority.total = (whitelist.auto[owner].highpriority.total or 0) + 1
                 end
@@ -352,7 +369,6 @@ menu.toggle_loop(autothrottler, "Enable", {}, "", function()
                 if settings.auto.cleanup then
                     for n, Pointer in ipairs(whitelist.auto[i].owner) do
                         if does_entity_from_pointer_exist(Pointer) then
-                            whitelist.auto[i].timer[Pointer] = util.current_time_millis()
                             delete(Pointer)
                         end
                     end
@@ -381,7 +397,6 @@ menu.toggle_loop(autothrottler, "Enable", {}, "", function()
                 if settings.auto.cleanup then
                     for n, Pointer in ipairs(whitelist.auto[i].owner) do
                         if does_entity_from_pointer_exist(Pointer) then
-                            whitelist.auto[i].timer[Pointer] = util.current_time_millis()
                             delete(Pointer)
                         end
                     end
@@ -429,7 +444,7 @@ menu.toggle_loop(bigthrottler, "Enable", {}, "", function()
     local pos = players.get_position(players.user())
     for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
         if whitelist.bigvehicle.logged[Pointer] == nil and (v3.distance(entities.get_position(Pointer), pos) < settings.bigvehicle.radius) then
-            if bigvehicle[entities.get_model_hash(Pointer)] and whitelist.bigvehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.bigvehicle.owner[Pointer] ~= players.user())) and ((settings.bigvehicle.excludeplayer and not is_pointer_a_player_vehicle(Pointer)) or not settings.bigvehicle.excludeplayer) then
+            if bigvehicle[entities.get_model_hash(Pointer)] and whitelist.bigvehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.bigvehicle.owner[Pointer] ~= players.user())) and ((settings.bigvehicle.excludeplayer and not is_entity_from_pointer_a_player_vehicle(Pointer)) or not settings.bigvehicle.excludeplayer) then
                 whitelist.bigvehicle.owner[Pointer] = get_entity_owner(Pointer)
                 whitelist.bigvehicle.logged[Pointer] = true
             else
@@ -442,12 +457,17 @@ menu.toggle_loop(bigthrottler, "Enable", {}, "", function()
     end
     if #Pointers > settings.bigvehicle.limit then
         local owners = {}
+        local models = {}
         for i, Pointer in ipairs(Pointers) do
-            owners[#owners + 1] = whitelist.bigvehicle.owner[Pointer]
+            owners[#owners+1] = whitelist.bigvehicle.owner[Pointer]
+            if bigvehicle[entities.get_model_hash(Pointer)] then
+                models[#models+1] = bigvehicle[entities.get_model_hash(Pointer)]
+            end
         end
         local owner = get_highest_count(owners)
+        local model, count = get_highest_count(models)
         if players.exists(owner) then
-            notification("Throttling big vehicles from "..players.get_name(owner), TOAST_ALL)
+            notification("Throttling big vehicles ("..tostring(model).." "..count.."x) from "..players.get_name(owner), TOAST_ALL)
             if util.current_time_millis() + settings.bigvehicle.timeout > synctimer[owner] then
                 synctimer[owner] = util.current_time_millis() + settings.bigvehicle.timeout
             end
@@ -500,7 +520,7 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
     for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
         if not whitelist.vehicle.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.vehicle.radius) then
             whitelist.vehicle.owner[Pointer] = get_entity_owner(Pointer)
-            if whitelist.vehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.vehicle.owner[Pointer] ~= players.user())) and ((settings.vehicle.excludeplayer and not is_pointer_a_player_vehicle(Pointer)) or not settings.vehicle.excludeplayer) then
+            if whitelist.vehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.vehicle.owner[Pointer] ~= players.user())) and ((settings.vehicle.excludeplayer and not is_entity_from_pointer_a_player_vehicle(Pointer)) or not settings.vehicle.excludeplayer) then
                 whitelist.vehicle.timer[Pointer] = util.current_time_millis()
             else
                 whitelist.vehicle.timer[Pointer] = 0
@@ -516,7 +536,7 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
     if #Pointers > settings.vehicle.limit then
         local owners = {}
         for i, Pointer in ipairs(Pointers) do
-            owners[#owners + 1] = whitelist.vehicle.owner[Pointer]
+            owners[#owners+1] = whitelist.vehicle.owner[Pointer]
         end
         local owner = get_highest_count(owners)
         if players.exists(owner) then
@@ -533,7 +553,6 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
                 for i, Pointer in ipairs(Pointers) do
                     if get_entity_owner(Pointer) == owner then
                         if does_entity_from_pointer_exist(Pointer) then
-                            whitelist.vehicle.timer[Pointer] = util.current_time_millis()
                             delete(Pointer)
                         end
                     end
@@ -541,7 +560,6 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
             else
                 for i, Pointer in ipairs(Pointers) do
                     if does_entity_from_pointer_exist(Pointer) then
-                        whitelist.vehicle.timer[Pointer] = util.current_time_millis()
                         delete(Pointer)
                     end
                 end
@@ -596,7 +614,7 @@ menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
     if #Pointers > settings.object.limit then
         local owners = {}
         for i, Pointer in ipairs(Pointers) do
-            owners[#owners + 1] = whitelist.object.owner[Pointer]
+            owners[#owners+1] = whitelist.object.owner[Pointer]
         end
         local owner = get_highest_count(owners)
         if players.exists(owner) then
@@ -613,7 +631,6 @@ menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
                 for i, Pointer in ipairs(Pointers) do
                     if get_entity_owner(Pointer) == owner then
                         if does_entity_from_pointer_exist(Pointer) then
-                            whitelist.object.timer[Pointer] = util.current_time_millis()
                             delete(Pointer)
                         end
                     end
@@ -621,7 +638,6 @@ menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
             else
                 for i, Pointer in ipairs(Pointers) do
                     if does_entity_from_pointer_exist(Pointer) then
-                        whitelist.object.timer[Pointer] = util.current_time_millis()
                         delete(Pointer)
                     end
                 end
@@ -673,7 +689,7 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
     if #Pointers > settings.ped.limit then
         local owners = {}
         for i, Pointer in ipairs(Pointers) do
-            owners[#owners + 1] = whitelist.ped.owner[Pointer]
+            owners[#owners+1] = whitelist.ped.owner[Pointer]
         end
         local owner = get_highest_count(owners)
         if players.exists(owner) then
@@ -690,7 +706,6 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
                 for i, Pointer in ipairs(Pointers) do
                     if (entities.get_player_info(Pointer) == 0) and get_entity_owner(Pointer) == owner then
                         if does_entity_from_pointer_exist(Pointer) then
-                            whitelist.ped.timer[Pointer] = util.current_time_millis()
                             delete(Pointer)
                         end
                     end
@@ -698,7 +713,6 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
             else
                 for i, Pointer in ipairs(Pointers) do
                     if does_entity_from_pointer_exist(Pointer) then
-                        whitelist.ped.timer[Pointer] = util.current_time_millis()
                         delete(Pointer)
                     end
                 end
@@ -732,8 +746,8 @@ menu.toggle(settingsroot, "Auto Update", {}, "", function(toggle)
 end, true)
 
 local updatetimer = 0
-menu.action(settingsroot, "Check for Updates", {}, "Manually check for updates.", function(toggle)
-    if updatetimer < util.current_time_millis() then
+menu.action(settingsroot, "Check for Updates", {}, "Manually check for updates.", function()
+    if (updatetimer < util.current_time_millis()) or debugmode then
         updatetimer = util.current_time_millis() + 15000
         local err = update_lua()
         if err == "" then
@@ -744,11 +758,11 @@ menu.action(settingsroot, "Check for Updates", {}, "Manually check for updates."
             end
         end
     else
-        util.toast("Please wait before trying again.")
+        notification("Please wait before trying again.")
     end
 end)
 
-menu.action(settingsroot, "View Changelog", {}, "", function(toggle)
+menu.action(settingsroot, "View Changelog", {}, "", function()
     util.toast("Version "..version.."\n"..changelog)
 end)
 
@@ -758,7 +772,7 @@ if not debugmode then
             util.yield()
         end
         if settings.autoupdate then
-            update_lua()
+            update_lua(true)
         end
     end, nil)
 end
