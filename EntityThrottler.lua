@@ -1,8 +1,10 @@
 -- Made by d6b
 
 local debugmode = false
-local version = 0.6
-local changelog = [[- Auto Updater will no longer display errors on lua startup
+local version = 0.601
+local changelog = [[- Fixed lag on cleanup
+Version 0.6
+- Auto Updater will no longer display errors on lua startup
 
 - Improved entity cleanup
 - Improved player timeout
@@ -11,7 +13,6 @@ local changelog = [[- Auto Updater will no longer display errors on lua startup
 - Fixed some functions
 - Fixed some minor bugs]]
 
-local deletethis = {}
 local synctimer = {}
 local settings = {
     auto = {
@@ -173,7 +174,6 @@ local function is_entity_from_pointer_a_mission_entity(addr)
 end
 local function delete(addr)
     if does_entity_from_pointer_exist(addr) and not is_entity_from_pointer_a_player(addr) then
-        deletethis[addr] = util.current_time_millis()
         entities.delete_by_pointer(addr)
     end
 end
@@ -226,28 +226,6 @@ local function get_entity_owner(addr)
     end
 end
 
-util.create_thread(function()
-    while true do
-        local num = 0
-        local exist = 0
-        for addr, time in pairs(deletethis) do
-            if time then
-                exist = exist+1
-                if does_entity_from_pointer_exist(addr) then
-                    num = num+1
-                    entities.delete_by_pointer(addr)
-                end
-                if time + 60000 < util.current_time_millis() then
-                    deletethis[addr] = nil
-                end
-            end
-        end
-        if debugmode then
-            util.draw_debug_text("Deleted: "..num.."/"..exist)
-        end
-        util.yield()
-    end
-end, nil)
 for i = 0, 31 do
     whitelist.auto[i] = {}
     whitelist.auto[i].owner = {}
