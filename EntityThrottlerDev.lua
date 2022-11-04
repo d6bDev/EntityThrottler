@@ -1,7 +1,7 @@
 -- Made by d6b
 
 local debugmode = true
-local version = "~0.7"
+local version = "0.6"
 local changelog = [[- Added deez]]
 
 local synctimer = {}
@@ -81,7 +81,7 @@ local function notification(body, ...)
 end
 local function update_lua(automatic)
     local err
-    async_http.init("raw.githubusercontent.com", "/d6bDev/Lua/main/EntityThrottler.lua", function(str, headerfields, statuscode)
+    async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottlerDev.lua", function(str, headerfields, statuscode)
         err = ""
         if statuscode == 200 then
             local gitversion, num = str:match('local version = %"(.-)%"'):gsub('"', ""):gsub('~', "")
@@ -96,15 +96,15 @@ local function update_lua(automatic)
                         file:close()
                         if num ~= 1 then
                             util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
-                            util.restart_script()
                         end
+                        util.restart_script()
                     else
                         err = "Failed to download update: Error loading file."
                     end
                 end
             end
         else
-            err = "Failed to find version information: Unexpected response code."
+            err = "Failed to find version information: Unexpected response code. ("..tostring(statuscode)..")"
         end
     end, function()
         err = "Failed to find version information: Request timed out."
