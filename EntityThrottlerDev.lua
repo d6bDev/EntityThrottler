@@ -743,9 +743,7 @@ end)
 menu.action(settingsroot, "View Changelog", {}, "", function()
     util.toast("Version "..version.."\n"..changelog)
 end)
---[[
-local version = 0.7
-]]
+--local version = 0.7
 util.create_thread(function()
     for i = 1, 8 do
         util.yield()
