@@ -1,6 +1,6 @@
 -- Made by d6b
 
-local debugmode <const> = true
+local debugmode <const> = false
 local version <const> = "0.7"
 local changelog <const> = [[- Updated updater error messages
 - const-afied code
