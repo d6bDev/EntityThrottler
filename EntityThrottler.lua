@@ -1,20 +1,17 @@
 -- Made by d6b
 
-local debugmode = false
-local version = 0.601
-local changelog = [[- Fixed lag on cleanup
-Version 0.6
-- Auto Updater will no longer display errors on lua startup
+local debugmode <const> = true
+local version <const> = "0.7"
+local changelog <const> = [[- Updated updater error messages
+- const-afied code
 
-- Improved entity cleanup
-- Improved player timeout
+- Improved updater and version system (now nicer on the eye)
+- Improved performance
 
-- Hopefully fixed all exceptions when cleanup kicks in, caused by attempting to delete nonexistant entities due to a delayed check
-- Fixed some functions
-- Fixed some minor bugs]]
+- Fixed some minor mistakes]]
 
-local synctimer = {}
-local settings = {
+local synctimer <const> = {}
+local settings <const> = {
     auto = {
         cleanup = false,
         interval = 10000,
@@ -54,7 +51,7 @@ local settings = {
     },
     autoupdate = true,
 }
-local whitelist = {
+local whitelist <const> = {
     auto = {
         logged = {},
     },
@@ -75,42 +72,49 @@ local whitelist = {
         owner = {},
     },
 }
-local bigvehiclenames = {"titan", "bombushka", "volatol", "alkonost", "kosatka", "avenger", "avenger2", "jet", "cargoplane", "blimp", "blimp2", "blimp3", "bus", "pbus", "pbus2", "nimbus", "airbus", "rentalbus", "tourbus", "tug", "tr", "tr2", "tr3", "tr4", "freight", "freightcar", "freightcar2", "freightcont1", "freighttrailer", "freightcont2", "freightgrain"}
-local bigvehicle = {}
+local bigvehiclenames <const> = {"titan", "bombushka", "volatol", "alkonost", "kosatka", "avenger", "avenger2", "jet", "cargoplane", "blimp", "blimp2", "blimp3", "bus", "pbus", "pbus2", "nimbus", "airbus", "rentalbus", "tourbus", "tug", "tr", "tr2", "tr3", "tr4", "freight", "freightcar", "freightcar2", "freightcont1", "freighttrailer", "freightcont2", "freightgrain"}
+local bigvehicle <const> = {}
 
 for i, Model in ipairs(bigvehiclenames) do
     bigvehicle[util.joaat(Model)] = Model
 end
 
-local function notification(body, ...)
+local notification <const> = function(body, ...)
     util.toast(body, ...)
     if debugmode then
         util.log(body)
     end
 end
-local function update_lua(automatic)
+local update_lua <const> = function(automatic)
     local err
-    async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottler.lua", function(str, headerfields, statuscode)
+    async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottlerDev.lua", function(str, headerfields, statuscode)
         err = ""
         if statuscode == 200 then
-            local gitversion = str:match("local version = (.-)[\r\n]")
-            local gitchangelog = str:match("local changelog = %[%[(.-)%]%]")
-            if gitversion and type(gitversion) == "string" then
-                if tonumber(gitversion) ~= version then
-                    local chunk = load(str)
-                    if chunk then
-                        local file = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
-                        file:write(str)
-                        file:close()
-                        util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
-                        util.restart_script()
-                    else
-                        err = "Failed to download update: Error loading file."
+            local ver <const> = str:match('local version <const> = %"(.-)%"')
+            local gitchangelog <const> = str:match("local changelog <const> = %[%[(.-)%]%]")
+            if ver and type(ver) == "string" and gitchangelog and type(gitchangelog) == "string" then
+                local gitversion <const>, num <const> = ver:gsub('"', ""):gsub('~', "")
+                if gitversion and type(gitversion) == "string" then
+                    if gitversion > version then
+                        local chunk <const> = load(str)
+                        if chunk then
+                            local file <const> = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
+                            file:write(str)
+                            file:close()
+                            if num ~= 1 then
+                                util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
+                                util.restart_script()
+                            end
+                        else
+                            err = "Failed to download update: Error loading file."
+                        end
                     end
                 end
+            else
+                err = "Failed to download update: Unable to fetch version information."
             end
         else
-            err = "Failed to find version information: Unexpected response code."
+            err = "Failed to find version information: Unexpected response code. ("..tostring(statuscode)..")"
         end
     end, function()
         err = "Failed to find version information: Request timed out."
@@ -121,7 +125,7 @@ local function update_lua(automatic)
         util.yield()
     until err ~= nil
     if not automatic and err ~= "" then
-        local time = util.current_time_millis() + 2000
+        local time <const> = util.current_time_millis() + 2000
         while time > util.current_time_millis() do
             directx.draw_text(0.5, 0.5, err, ALIGN_CENTRE, 1, {r = 1, g = 0.5, b = 0.5, a = 1})
             util.yield()
@@ -129,7 +133,7 @@ local function update_lua(automatic)
     end
     return err
 end
-local function does_entity_from_pointer_exist(addr)
+local does_entity_from_pointer_exist <const> = function(addr)
     for i, Pointer in entities.get_all_vehicles_as_pointers() do
         if Pointer == addr then
             return true
@@ -152,7 +156,7 @@ local function does_entity_from_pointer_exist(addr)
     end
     return false
 end
-local function is_entity_from_pointer_a_player(addr)
+local is_entity_from_pointer_a_player <const> = function(addr)
     for i, Pointer in entities.get_all_peds_as_pointers() do
         if Pointer == addr then
             return entities.get_player_info(addr) ~= 0
@@ -160,7 +164,7 @@ local function is_entity_from_pointer_a_player(addr)
     end
     return false
 end
-local function is_entity_from_pointer_a_player_vehicle(addr)
+local is_entity_from_pointer_a_player_vehicle <const> = function(addr)
     for i, Pointer in entities.get_all_vehicles_as_pointers() do
         if Pointer == addr then
             return entities.get_vehicle_has_been_owned_by_player(addr)
@@ -168,18 +172,18 @@ local function is_entity_from_pointer_a_player_vehicle(addr)
     end
     return false
 end
-local function is_entity_from_pointer_a_mission_entity(addr)
-    local NetObj = memory.read_long(addr + 0xD0)
+local is_entity_from_pointer_a_mission_entity <const> = function(addr)
+    local NetObj <const> = memory.read_long(addr + 0xD0)
     return ((NetObj and NetObj ~= 0) and (memory.read_ubyte(NetObj + 0x4E) ~= 0))
 end
-local function delete(addr)
+local delete <const> = function(addr)
     if does_entity_from_pointer_exist(addr) and not is_entity_from_pointer_a_player(addr) then
         entities.delete_by_pointer(addr)
     end
 end
-local function merge_table(noduplicates, ...)
-    local tbl = {...}
-    local out = (noduplicates and {} or tbl[1])
+local merge_table <const> = function(noduplicates, ...)
+    local tbl <const> = {...}
+    local out <const> = (noduplicates and {} or tbl[1])
     for i = 1, #tbl do
         for n = 1, #tbl[i] do
             out[#out+1] = tbl[i][n]
@@ -187,16 +191,16 @@ local function merge_table(noduplicates, ...)
     end
     return out
 end
-local function table_entry_counts(tbl)
-    local counts = {}
+local table_entry_counts <const> = function(tbl)
+    local counts <const> = {}
     for k, v in pairs(tbl) do
-        local entry = tbl[k]
+        local entry <const> = tbl[k]
         counts[entry] = (counts[entry] or 0) + 1
     end
     return counts
 end
-local function get_highest_count(tbl)
-    local counts = table_entry_counts(tbl)
+local get_highest_count <const> = function(tbl)
+    local counts <const> = table_entry_counts(tbl)
     local count = 0
     local value = -1
     for k, v in pairs(counts) do
@@ -207,16 +211,16 @@ local function get_highest_count(tbl)
     end
     return value, count
 end
-local function get_entity_owner(addr)
+local get_entity_owner <const> = function(addr)
     if type(addr) == "table" then
-        local owners = {}
+        local owners <const> = {}
         for k, v in pairs(addr) do
             owners[#owners+1] = get_entity_owner(v)
         end
         return get_highest_count(owners)
     else
         if util.is_session_started() and not util.is_session_transition_active() then
-            local NetObj = memory.read_long(addr + 0xD0)
+            local NetObj <const> = memory.read_long(addr + 0xD0)
             if NetObj and NetObj ~= 0 then
                 return memory.read_byte(NetObj + 0x49)
             end
@@ -237,13 +241,13 @@ for i = 0, 31 do
     }
     synctimer[i] = 0
     util.create_thread(function()
-        local pid = i
+        local pid <const> = i
         while true do
             if players.exists(pid) then
                 if pid ~= players.user() and synctimer[pid] > util.current_time_millis() then
-                    local Sync = menu.ref_by_rel_path(menu.player_root(pid), "Incoming Syncs>Block")
+                    local Sync <const> = menu.ref_by_rel_path(menu.player_root(pid), "Incoming Syncs>Block")
                     menu.trigger_command(Sync, "on")
-                    local knownentities = {}
+                    local knownentities <const> = {}
                     for n, Pointer in entities.get_all_vehicles_as_pointers() do
                         knownentities[Pointer] = true
                     end
@@ -288,19 +292,19 @@ for i = 0, 31 do
     end, nil)
 end
 
-local autothrottler = menu.list(menu.my_root(), "Auto Throttler", {}, "")
+local autothrottler <const> = menu.list(menu.my_root(), "Auto Throttler", {}, "")
 
 menu.toggle_loop(autothrottler, "Enable", {}, "", function()
-    local allents = merge_table(false, entities.get_all_vehicles_as_pointers(), entities.get_all_peds_as_pointers(), entities.get_all_pickups_as_pointers(), entities.get_all_objects_as_pointers())
+    local allents <const> = merge_table(false, entities.get_all_vehicles_as_pointers(), entities.get_all_peds_as_pointers(), entities.get_all_pickups_as_pointers(), entities.get_all_objects_as_pointers())
     for i, Pointer in ipairs(allents) do
-        local owner = get_entity_owner(Pointer)
+        local owner <const> = get_entity_owner(Pointer)
         if not whitelist.auto.logged[Pointer] then
             whitelist.auto.logged[Pointer] = true
             if owner ~= -1 and players.exists(owner) and owner ~= players.user() then
                 whitelist.auto[owner].owner[#whitelist.auto[owner].owner+1] = Pointer
                 whitelist.auto[owner].current[#whitelist.auto[owner].current+1] = Pointer
                 whitelist.auto[owner].timer[Pointer] = util.current_time_millis()
-                local model = entities.get_model_hash(Pointer)
+                local model <const> = entities.get_model_hash(Pointer)
                 whitelist.auto[owner].models[model] = (whitelist.auto[owner].models[model] or 0) + 1
                 if is_entity_from_pointer_a_mission_entity(Pointer) then
                     whitelist.auto[owner].highpriority[Pointer] = true
@@ -314,13 +318,13 @@ menu.toggle_loop(autothrottler, "Enable", {}, "", function()
     end
     for i = 0, 31 do
         if players.exists(i) then
-            local existing = {}
-            local existing2 = {}
+            local existing <const> = {}
+            local existing2 <const> = {}
             for n, Pointer in ipairs(whitelist.auto[i].current) do
                 if does_entity_from_pointer_exist(Pointer) and whitelist.auto[i].timer[Pointer] + settings.auto.interval > util.current_time_millis() then
                     existing[#existing+1] = Pointer
                 else
-                    local model = entities.get_model_hash(Pointer)
+                    local model <const> = entities.get_model_hash(Pointer)
                     whitelist.auto[i].models[model] = (whitelist.auto[i].models[model] or 1) - 1
                     if whitelist.auto[i].highpriority[Pointer] then
                         whitelist.auto[i].highpriority[Pointer] = nil
@@ -415,11 +419,11 @@ menu.slider(autothrottler, "Model Limit", {}, "Specify a limit in the amount of 
     settings.auto.modellimit = value
 end)
 
-local bigthrottler = menu.list(menu.my_root(), "Big Vehicle Throttler", {}, "")
+local bigthrottler <const> = menu.list(menu.my_root(), "Big Vehicle Throttler", {}, "")
 
 menu.toggle_loop(bigthrottler, "Enable", {}, "", function()
-    local Pointers = {}
-    local pos = players.get_position(players.user())
+    local Pointers <const> = {}
+    local pos <const> = players.get_position(players.user())
     for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
         if whitelist.bigvehicle.logged[Pointer] == nil and (v3.distance(entities.get_position(Pointer), pos) < settings.bigvehicle.radius) then
             if bigvehicle[entities.get_model_hash(Pointer)] and whitelist.bigvehicle.owner[Pointer] ~= -1 and (debugmode or (whitelist.bigvehicle.owner[Pointer] ~= players.user())) and ((settings.bigvehicle.excludeplayer and not is_entity_from_pointer_a_player_vehicle(Pointer)) or not settings.bigvehicle.excludeplayer) then
@@ -434,16 +438,16 @@ menu.toggle_loop(bigthrottler, "Enable", {}, "", function()
         end
     end
     if #Pointers > settings.bigvehicle.limit then
-        local owners = {}
-        local models = {}
+        local owners <const> = {}
+        local models <const> = {}
         for i, Pointer in ipairs(Pointers) do
             owners[#owners+1] = whitelist.bigvehicle.owner[Pointer]
             if bigvehicle[entities.get_model_hash(Pointer)] then
                 models[#models+1] = bigvehicle[entities.get_model_hash(Pointer)]
             end
         end
-        local owner = get_highest_count(owners)
-        local model, count = get_highest_count(models)
+        local owner <const> = get_highest_count(owners)
+        local model <const>, count <const> = get_highest_count(models)
         if players.exists(owner) then
             notification("Throttling big vehicles ("..tostring(model).." "..count.."x) from "..players.get_name(owner), TOAST_ALL)
             if util.current_time_millis() + settings.bigvehicle.timeout > synctimer[owner] then
@@ -490,11 +494,11 @@ menu.slider(bigthrottler, "Radius", {}, "Specify a distance around you where ent
     settings.bigvehicle.radius = value
 end)
 
-local vehiclethrottler = menu.list(menu.my_root(), "Vehicle Throttler", {}, "")
+local vehiclethrottler <const> = menu.list(menu.my_root(), "Vehicle Throttler", {}, "")
 
 menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
-    local Pointers = {}
-    local pos = players.get_position(players.user())
+    local Pointers <const> = {}
+    local pos <const> = players.get_position(players.user())
     for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
         if not whitelist.vehicle.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.vehicle.radius) then
             whitelist.vehicle.owner[Pointer] = get_entity_owner(Pointer)
@@ -512,11 +516,11 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
         util.draw_debug_text("Vehicles: "..#Pointers.."/"..#entities.get_all_vehicles_as_pointers())
     end
     if #Pointers > settings.vehicle.limit then
-        local owners = {}
+        local owners <const> = {}
         for i, Pointer in ipairs(Pointers) do
             owners[#owners+1] = whitelist.vehicle.owner[Pointer]
         end
-        local owner = get_highest_count(owners)
+        local owner <const> = get_highest_count(owners)
         if players.exists(owner) then
             notification("Throttling vehicles from "..players.get_name(owner), TOAST_ALL)
             if util.current_time_millis() + settings.vehicle.timeout > synctimer[owner] then
@@ -527,8 +531,7 @@ menu.toggle_loop(vehiclethrottler, "Enable", {}, "", function()
         end
         if settings.vehicle.cleanup then
             if players.exists(owner) then
-                Pointers = entities.get_all_vehicles_as_pointers()
-                for i, Pointer in ipairs(Pointers) do
+                for i, Pointer in ipairs(entities.get_all_vehicles_as_pointers()) do
                     if get_entity_owner(Pointer) == owner then
                         if does_entity_from_pointer_exist(Pointer) then
                             delete(Pointer)
@@ -567,12 +570,12 @@ menu.slider(vehiclethrottler, "Radius", {}, "Specify a distance around you where
     settings.vehicle.radius = value
 end)
 
-local objectthrottler = menu.list(menu.my_root(), "Object Throttler", {}, "")
+local objectthrottler <const> = menu.list(menu.my_root(), "Object Throttler", {}, "")
 
 menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
-    local Pointers = {}
-    local pos = players.get_position(players.user())
-    local og = merge_table(true, entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
+    local Pointers <const> = {}
+    local pos <const> = players.get_position(players.user())
+    local og <const> = merge_table(true, entities.get_all_objects_as_pointers(), entities.get_all_pickups_as_pointers())
     for i, Pointer in ipairs(og) do
         if not whitelist.object.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.object.radius) then
             whitelist.object.owner[Pointer] = get_entity_owner(Pointer)
@@ -590,11 +593,11 @@ menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
         util.draw_debug_text("Objects: "..#Pointers.."/"..#og)
     end
     if #Pointers > settings.object.limit then
-        local owners = {}
+        local owners <const> = {}
         for i, Pointer in ipairs(Pointers) do
             owners[#owners+1] = whitelist.object.owner[Pointer]
         end
-        local owner = get_highest_count(owners)
+        local owner <const> = get_highest_count(owners)
         if players.exists(owner) then
             notification("Throttling objects from "..players.get_name(owner), TOAST_ALL)
             if util.current_time_millis() + settings.object.timeout > synctimer[owner] then
@@ -605,8 +608,7 @@ menu.toggle_loop(objectthrottler, "Enable", {}, "", function()
         end
         if settings.object.cleanup then
             if players.exists(owner) then
-                Pointers = entities.get_all_objects_as_pointers()
-                for i, Pointer in ipairs(Pointers) do
+                for i, Pointer in ipairs(entities.get_all_objects_as_pointers()) do
                     if get_entity_owner(Pointer) == owner then
                         if does_entity_from_pointer_exist(Pointer) then
                             delete(Pointer)
@@ -642,12 +644,11 @@ menu.slider(objectthrottler, "Radius", {}, "Specify a distance around you where 
     settings.object.radius = value
 end)
 
-local pedthrottler = menu.list(menu.my_root(), "Ped Throttler", {}, "")
+local pedthrottler <const> = menu.list(menu.my_root(), "Ped Throttler", {}, "")
 
 menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
-    local Pointers = {}
-    local pos = players.get_position(players.user())
-    local allpeds = entities.get_all_peds_as_pointers()
+    local Pointers <const> = {}
+    local pos <const> = players.get_position(players.user())
     for i, Pointer in ipairs(entities.get_all_peds_as_pointers()) do
         if not whitelist.ped.timer[Pointer] and (v3.distance(entities.get_position(Pointer), pos) < settings.ped.radius) then
             whitelist.ped.owner[Pointer] = get_entity_owner(Pointer)
@@ -665,11 +666,11 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
         util.draw_debug_text("Peds: "..#Pointers.."/"..#entities.get_all_peds_as_pointers())
     end
     if #Pointers > settings.ped.limit then
-        local owners = {}
+        local owners <const> = {}
         for i, Pointer in ipairs(Pointers) do
             owners[#owners+1] = whitelist.ped.owner[Pointer]
         end
-        local owner = get_highest_count(owners)
+        local owner <const> = get_highest_count(owners)
         if players.exists(owner) then
             notification("Throttling peds from "..players.get_name(owner), TOAST_ALL)
             if util.current_time_millis() + settings.ped.timeout > synctimer[owner] then
@@ -680,8 +681,7 @@ menu.toggle_loop(pedthrottler, "Enable", {}, "", function()
         end
         if settings.ped.cleanup then
             if players.exists(owner) then
-                Pointers = entities.get_all_peds_as_pointers()
-                for i, Pointer in ipairs(Pointers) do
+                for i, Pointer in ipairs(entities.get_all_peds_as_pointers()) do
                     if (entities.get_player_info(Pointer) == 0) and get_entity_owner(Pointer) == owner then
                         if does_entity_from_pointer_exist(Pointer) then
                             delete(Pointer)
@@ -717,7 +717,7 @@ menu.slider(pedthrottler, "Radius", {}, "Specify a distance around you where the
     settings.ped.radius = value
 end)
 
-local settingsroot = menu.list(menu.my_root(), "Settings", {}, "")
+local settingsroot <const> = menu.list(menu.my_root(), "Settings", {}, "")
 
 menu.toggle(settingsroot, "Auto Update", {}, "", function(toggle)
     settings.autoupdate = toggle
@@ -727,9 +727,9 @@ local updatetimer = 0
 menu.action(settingsroot, "Check for Updates", {}, "Manually check for updates.", function()
     if (updatetimer < util.current_time_millis()) or debugmode then
         updatetimer = util.current_time_millis() + 15000
-        local err = update_lua()
+        local err <const> = update_lua()
         if err == "" then
-            local time = util.current_time_millis() + 2000
+            local time <const> = util.current_time_millis() + 2000
             while time > util.current_time_millis() do
                 directx.draw_text(0.5, 0.5, "No updates found.", ALIGN_CENTRE, 1, {r = 0.5, g = 1, b = 0.5, a = 1})
                 util.yield()
@@ -743,14 +743,19 @@ end)
 menu.action(settingsroot, "View Changelog", {}, "", function()
     util.toast("Version "..version.."\n"..changelog)
 end)
+--[[local version = 0.7
+local changelog = [[- Updated updater error messages
+- const-afied code
 
-if not debugmode then
-    util.create_thread(function()
-        for i = 1, 8 do
-            util.yield()
-        end
-        if settings.autoupdate then
-            update_lua(true)
-        end
-    end, nil)
-end
+- Improved updater and version system (now nicer on the eye)
+- Improved performance
+
+- Fixed some minor mistakes]] -- left to support old versions of script's way to get version information that havent updated yet
+util.create_thread(function()
+    for i = 1, 8 do
+        util.yield()
+    end
+    if settings.autoupdate then
+        update_lua(true)
+    end
+end, nil)
