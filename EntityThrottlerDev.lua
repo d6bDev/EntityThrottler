@@ -1,7 +1,7 @@
 -- Made by d6b
 
 local debugmode <const> = true
-local version <const> = "0.7"
+local version <const> = "0.7.0"
 local changelog <const> = [[- Updated updater error messages
 
 - Improved auto updater and version system (now nicer on the eye)
@@ -89,23 +89,28 @@ local update_lua <const> = function(automatic)
     async_http.init("raw.githubusercontent.com", "/d6bDev/EntityThrottler/main/EntityThrottlerDev.lua", function(str, headerfields, statuscode)
         err = ""
         if statuscode == 200 then
-            local gitversion <const>, num <const> = str:match('local version = %"(.-)%"'):gsub('"', ""):gsub('~', "")
-            local gitchangelog <const> = str:match("local changelog = %[%[(.-)%]%]")
-            if gitversion and type(gitversion) == "string" then
-                if gitversion > version then
-                    local chunk <const> = load(str)
-                    if chunk then
-                        local file <const> = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
-                        file:write(str)
-                        file:close()
-                        if num ~= 1 then
-                            util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
-                            util.restart_script()
+            local ver <const> = str:match('local version <const> = %"(.-)%"')
+            if ver then
+                local gitversion <const>, num <const> = ver:gsub('"', ""):gsub('~', "")
+                local gitchangelog <const> = str:match("local changelog <const> = %[%[(.-)%]%]")
+                if gitversion and type(gitversion) == "string" then
+                    if gitversion > version then
+                        local chunk <const> = load(str)
+                        if chunk then
+                            local file <const> = io.open(filesystem.scripts_dir()..SCRIPT_RELPATH, "w")
+                            file:write(str)
+                            file:close()
+                            if num ~= 1 then
+                                util.toast("Successfully updated to version "..gitversion.."\n"..gitchangelog)
+                                util.restart_script()
+                            end
+                        else
+                            err = "Failed to download update: Error loading file."
                         end
-                    else
-                        err = "Failed to download update: Error loading file."
                     end
                 end
+            else
+                err = "Failed to download update: Unable to fetch version information."
             end
         else
             err = "Failed to find version information: Unexpected response code. ("..tostring(statuscode)..")"
