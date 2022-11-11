@@ -5,7 +5,7 @@ local version <const> = "0.7"
 local changelog <const> = [[- Updated updater error messages
 - const-afied code
 
-- Improved auto updater and version system (now nicer on the eye)
+- Improved updater and version system (now nicer on the eye)
 - Improved performance
 
 - Fixed some minor mistakes]]
@@ -743,7 +743,14 @@ end)
 menu.action(settingsroot, "View Changelog", {}, "", function()
     util.toast("Version "..version.."\n"..changelog)
 end)
---local version = 0.7
+--[[local version = 0.7
+local changelog = [[- Updated updater error messages
+- const-afied code
+
+- Improved updater and version system (now nicer on the eye)
+- Improved performance
+
+- Fixed some minor mistakes]] -- left to support old versions of script's way to get version information that havent updated yet
 util.create_thread(function()
     for i = 1, 8 do
         util.yield()
