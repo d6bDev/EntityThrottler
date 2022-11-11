@@ -1,11 +1,12 @@
 -- Made by d6b
 
 local debugmode <const> = true
-local version <const> = "0.7.0"
+local version <const> = "0.7"
 local changelog <const> = [[- Updated updater error messages
+- const-afied code
 
 - Improved auto updater and version system (now nicer on the eye)
-- Improved performance (const-afied everything)
+- Improved performance
 
 - Fixed some minor mistakes]]
 
@@ -90,9 +91,9 @@ local update_lua <const> = function(automatic)
         err = ""
         if statuscode == 200 then
             local ver <const> = str:match('local version <const> = %"(.-)%"')
-            if ver then
+            local gitchangelog <const> = str:match("local changelog <const> = %[%[(.-)%]%]")
+            if ver and type(ver) == "string" and gitchangelog and type(gitchangelog) == "string" then
                 local gitversion <const>, num <const> = ver:gsub('"', ""):gsub('~', "")
-                local gitchangelog <const> = str:match("local changelog <const> = %[%[(.-)%]%]")
                 if gitversion and type(gitversion) == "string" then
                     if gitversion > version then
                         local chunk <const> = load(str)
@@ -742,10 +743,7 @@ end)
 menu.action(settingsroot, "View Changelog", {}, "", function()
     util.toast("Version "..version.."\n"..changelog)
 end)
-
-if debugmode then
-    util.toast("I see you enabled debug mode. Don't complain about bugs and wonder about weird things happening now...")
-end
+--local version = 0.7
 util.create_thread(function()
     for i = 1, 8 do
         util.yield()
